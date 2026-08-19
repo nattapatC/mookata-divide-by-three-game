@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>หมูกระทะจำนวนนับที่หารด้วย 3 ลงตัว</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for Sounds -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Mitr', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a202c;
+            touch-action: none; /* Prevent scrolling on canvas */
+        }
+
+        /* Video Background */
+        .img-bg {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            transform: translateX(-50%) translateY(-50%);
+            object-fit: cover;
+        }
+
+        /* Bounce Animation */
+        @keyframes bounce-custom {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        .animate-bounce-title {
+            animation: bounce-custom 2s infinite ease-in-out;
+        }
+
+        /* Glow Button Effect */
+        .btn-glow {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow:
+                0 12px 30px rgba(0, 0, 0, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(14px) saturate(160%);
+            -webkit-backdrop-filter: blur(14px) saturate(160%);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+        .btn-glow::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.08));
+            opacity: 0.35;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow:
+                0 16px 36px rgba(0, 0, 0, 0.22),
+                0 0 0 1px rgba(255, 255, 255, 0.4) inset,
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+        .btn-glow:active {
+            transform: scale(0.95);
+        }
+
+        /* Game Canvas */
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #webcamVideo {
+            display: none; /* Hidden, used only for MediaPipe input */
+        }
+
+        /* Screen transitions */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease, visibility 0.5s;
+        }
+        #menuScreen {
+            justify-content: flex-end;
+            padding-bottom: 1.5rem;
+        }
+        .hidden-screen {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        /* Modal */
+        .modal-bg {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .hud-glass {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            backdrop-filter: blur(14px) saturate(160%);
+            -webkit-backdrop-filter: blur(14px) saturate(160%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+            font-size: 1.25rem;
+            line-height: 1.5rem;
+        }
+        .hud-pill {
+            padding: 0.65rem 1rem;
+            border-radius: 9999px;
+        }
+
+        @media (max-width: 767px) {
+            .hud-glass {
+                font-size: 0.95rem;
+                line-height: 1.15rem;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+            .hud-pill {
+                padding: 0.45rem 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Video Background -->
+    <video class="img-bg" id="menuBg" autoplay loop playsinline preload="auto">
+        <source src="assets/cover.mp4" type="video/mp4">
+    </video>
+
+    <!-- Menu Screen -->
+    <div id="menuScreen" class="screen justify-end pb-6 md:pb-10">
+        <!-- Help Button -->
+        <button id="btnHelp" class="absolute top-4 right-4 w-11 h-11 md:w-12 md:h-12 rounded-full bg-blue-500 text-white font-bold text-2xl btn-glow border-4 border-white">?</button>
+        
+        <div class="w-[calc(100%-1.5rem)] max-w-2xl flex flex-col sm:flex-row gap-3 sm:gap-6 items-stretch sm:items-center justify-center">
+            <button id="btnNormal" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full bg-gradient-to-r from-pink-500 to-red-500 text-white font-bold text-lg sm:text-2xl btn-glow border-4 border-white">
+                เล่นโหมดปกติ
+            </button>
+            <button id="btnAR" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold text-lg sm:text-2xl btn-glow border-4 border-white">
+                เล่นโหมด AR
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen hidden-screen bg-gray-900">
+        <canvas id="gameCanvas"></canvas>
+        <video id="webcamVideo" autoplay playsinline></video>
+        
+        <!-- UI Overlay -->
+        <div class="absolute top-4 left-4 text-white font-bold text-3xl drop-shadow-md hud-glass hud-pill">
+            เวลา: <span id="timeDisplay" class="text-yellow-400">120</span> วินาที
+        </div>
+        <div class="absolute top-4 right-4 text-white font-bold text-3xl drop-shadow-md hud-glass hud-pill">
+            คะแนน: <span id="scoreDisplay" class="text-green-400">0</span>
+        </div>
+        <button id="btnExit" class="absolute bottom-4 right-4 px-6 py-3 rounded-full bg-red-600 text-white font-bold text-xl btn-glow border-2 border-white hud-glass">
+            ออก
+        </button>
+        
+        <!-- Loading AR Overlay -->
+        <div id="loadingAR" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center hidden-screen z-50">
+            <div class="w-16 h-16 border-8 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <h2 class="text-white text-3xl font-bold">กำลังโหลดระบบ AR...</h2>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="absolute inset-0 modal-bg flex items-center justify-center hidden-screen z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl transform transition-transform scale-95">
+            <h2 class="text-4xl font-bold text-red-500 mb-4">วิธีเล่น</h2>
+            <p class="text-xl text-gray-700 mb-2 font-semibold">กติกา:</p>
+            <p class="text-lg text-gray-600 mb-4">เลือกชิ้นหมูที่มีตัวเลข <b>หารด้วย 3 ลงตัว</b> ไปวางบนจานให้ถูกต้องภายในเวลา 120 วินาที</p>
+            
+            <p class="text-xl text-gray-700 mb-2 font-semibold mt-4">โหมดปกติ:</p>
+            <p class="text-lg text-gray-600 mb-4">ใช้เมาส์หรือนิ้วลากชิ้นหมูไปวางบนจาน</p>
+            
+            <p class="text-xl text-gray-700 mb-2 font-semibold mt-4">โหมด AR (ต้องเปิดกล้อง):</p>
+            <p class="text-lg text-gray-600 mb-6">ใช้กล้องตรวจจับมือ นำนิ้วชี้และนิ้วโป้งจีบเข้าหากันเพื่อใช้ตะเกียบคีบหมู</p>
+            
+            <button id="btnCloseHelp" class="px-8 py-3 rounded-full bg-red-500 text-white font-bold text-xl btn-glow">เข้าใจแล้ว!</button>
+        </div>
+    </div>
+    
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="absolute inset-0 modal-bg flex items-center justify-center hidden-screen z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl">
+            <h2 class="text-5xl font-bold text-pink-500 mb-4 animate-bounce-title">หมดเวลา!</h2>
+            <p class="text-2xl text-gray-700 mb-2 font-semibold">คะแนนของคุณ</p>
+            <p id="finalScore" class="text-6xl text-green-500 font-bold mb-8">0</p>
+            <button id="btnBackToMenu" class="px-8 py-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-2xl btn-glow">
+                กลับสู่หน้าหลัก
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
+
+        // --- GLOBAL VARIABLES ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('webcamVideo');
+        
+        let gameState = 'menu'; // menu, playing_normal, playing_ar
+        let score = 0;
+        let timeLeft = 120;
+        let timerInterval = null;
+        let animationFrameId = null;
+        
+        // Game Entities
+        let porks = [];
+        let particles = [];
+        let floatingTexts = [];
+        let pan = { x: 0, y: 0, radius: 250 };
+        let plate = { x: 0, y: 0, radius: 180 };
+        
+        // AR Variables
+        let handLandmarker = null;
+        let isARReady = false;
+        let lastVideoTime = -1;
+        let handX = 0, handY = 0;
+        let smoothHandX = 0, smoothHandY = 0;
+        let isPinching = false;
+        let pinchedPork = null;
+        
+        // Mouse Variables
+        let mouseX = 0, mouseY = 0;
+        let isMouseDown = false;
+        let draggedPork = null;
+
+        // Image Assets
+        const assets = {
+            bg: new Image(),
+            pan: new Image(),
+            plate: new Image(),
+            pork: new Image(),
+            chopsticks: new Image()
+        };
+        // โหลด SVG assets ในโฟลเดอร์ local
+        assets.bg.src = 'assets/table.svg';
+        assets.pan.src = 'assets/mookata-tao.svg';
+        assets.plate.src = 'assets/plain.svg';
+        assets.pork.src = 'assets/pork.svg';
+
+        // BGM Synth
+        let bgmLoop = null;
+        let bgmBassLoop = null;
+        let sizzleLoop = null;
+        let sizzleSynth = null;
+        let musicStep = 0;
+        const menuBg = document.getElementById('menuBg');
+
+        // --- AUDIO & SPEECH ---
+        async function initAudio() {
+            await Tone.start();
+            if (!bgmLoop) {
+                const lead = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "square" },
+                    envelope: { attack: 0.01, decay: 0.12, sustain: 0.35, release: 0.18 }
+                }).toDestination();
+                lead.volume.value = -16;
+
+                const bass = new Tone.MonoSynth({
+                    oscillator: { type: "sawtooth" },
+                    filter: { Q: 2, type: "lowpass", rolloff: -24 },
+                    envelope: { attack: 0.01, decay: 0.18, sustain: 0.2, release: 0.12 },
+                    filterEnvelope: { attack: 0.01, decay: 0.12, sustain: 0.3, release: 0.2, baseFrequency: 90, octaves: 2.2 }
+                }).toDestination();
+                bass.volume.value = -14;
+
+                const kick = new Tone.MembraneSynth({
+                    pitchDecay: 0.02,
+                    octaves: 6,
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.001, decay: 0.25, sustain: 0.01, release: 0.02 }
+                }).toDestination();
+                kick.volume.value = -8;
+
+                const hat = new Tone.MetalSynth({
+                    frequency: 220,
+                    envelope: { attack: 0.001, decay: 0.09, release: 0.01 },
+                    harmonicity: 5.1,
+                    modulationIndex: 32,
+                    resonance: 3500,
+                    octaves: 1.5
+                }).toDestination();
+                hat.volume.value = -22;
+
+                const sizzle = new Tone.NoiseSynth({
+                    noise: { type: "pink" },
+                    envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.03 }
+                }).toDestination();
+                sizzle.volume.value = -34;
+                sizzleSynth = sizzle;
+
+                const melody = [
+                    ["E4", "G4", "B4"],
+                    ["D4", "F4", "A4"],
+                    ["C4", "E4", "G4"],
+                    ["G3", "B3", "D4"]
+                ];
+                const bassNotes = ["E2", "D2", "C2", "G1"];
+                const hihatPattern = [0, 1, 0, 1, 0, 1, 1, 1];
+                bgmLoop = new Tone.Loop(time => {
+                    lead.triggerAttackRelease(melody[musicStep % melody.length], "8n", time);
+                    musicStep++;
+                }, "2n");
+                bgmBassLoop = new Tone.Loop(time => {
+                    bass.triggerAttackRelease(bassNotes[musicStep % bassNotes.length], "8n", time);
+                    if (musicStep % 2 === 0) kick.triggerAttackRelease("C1", "8n", time);
+                    if (hihatPattern[musicStep % hihatPattern.length]) hat.triggerAttackRelease("16n", time);
+                }, "8n");
+                sizzleLoop = new Tone.Loop(time => {
+                    if (Math.random() > 0.04) {
+                        sizzle.triggerAttackRelease("16n", time, 0.45 + Math.random() * 0.2);
+                    }
+                }, "16n");
+                Tone.Transport.bpm.value = 152;
+                bgmLoop.start(0);
+                bgmBassLoop.start(0);
+                sizzleLoop.start(0);
+            }
+            musicStep = 0;
+            Tone.Transport.position = "0:0:0";
+            if (Tone.Transport.state !== "started") Tone.Transport.start();
+        }
+
+        function playCorrectSound() {
+            const synth = new Tone.Synth().toDestination();
+            const now = Tone.now();
+            synth.triggerAttackRelease("C5", "16n", now);
+            synth.triggerAttackRelease("E5", "16n", now + 0.1);
+            synth.triggerAttackRelease("G5", "16n", now + 0.2);
+            synth.triggerAttackRelease("C6", "4n", now + 0.3);
+        }
+
+        function playWrongSound() {
+            const synth = new Tone.Synth().toDestination();
+            synth.triggerAttackRelease("C3", "4n");
+        }
+
+        function playSizzleBurst(intensity = 1) {
+            if (!sizzleSynth) return;
+            const now = Tone.now();
+            const volume = 0.35 + (intensity * 0.25);
+            sizzleSynth.triggerAttackRelease("16n", now, volume);
+            sizzleSynth.triggerAttackRelease("32n", now + 0.06, volume * 0.8);
+            sizzleSynth.triggerAttackRelease("32n", now + 0.12, volume * 0.7);
+        }
+
+        function speak(text, pitch = 1.5) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Stop current speech
+                let u = new SpeechSynthesisUtterance(text);
+                u.lang = 'th-TH';
+                u.rate = 1.2;
+                u.pitch = pitch;
+                window.speechSynthesis.speak(u);
+            }
+        }
+
+        // --- AR INITIALIZATION ---
+        async function initAR() {
+            if (isARReady) return true;
+            document.getElementById('loadingAR').classList.remove('hidden-screen');
+            
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+                );
+                
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+                
+                // Start Webcam
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 1280, height: 720, facingMode: "user" } 
+                });
+                video.srcObject = stream;
+                
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+                
+                isARReady = true;
+                document.getElementById('loadingAR').classList.add('hidden-screen');
+                return true;
+            } catch (err) {
+                console.error("AR Initialization Failed:", err);
+                alert("ไม่สามารถเปิดใช้งานกล้องหรือ AR ได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้อง");
+                document.getElementById('loadingAR').classList.add('hidden-screen');
+                return false;
+            }
+        }
+
+        function stopWebcam() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        }
+
+        function isMobileLayout() {
+            return window.innerWidth < 768;
+        }
+
+        function pauseMenuVideo() {
+            menuBg.pause();
+        }
+
+        async function replayMenuVideo() {
+            try {
+                menuBg.currentTime = 0;
+                menuBg.muted = false;
+                menuBg.volume = 1;
+                await menuBg.play();
+            } catch (err) {
+                console.warn('Unable to replay menu video:', err);
+            }
+        }
+
+        // --- GAME LOGIC ---
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const mobile = isMobileLayout();
+            // Responsive positions
+            pan.x = canvas.width * (mobile ? 0.5 : 0.32);
+            pan.y = canvas.height * (mobile ? 0.28 : 0.55);
+            pan.radius = Math.min(canvas.width, canvas.height) * (mobile ? 0.28 : 0.36);
+            
+            plate.x = canvas.width * (mobile ? 0.5 : 0.8);
+            plate.y = canvas.height * (mobile ? 0.79 : 0.55);
+            plate.radius = Math.min(canvas.width, canvas.height) * (mobile ? 0.16 : 0.2);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function startGame(mode) {
+            initAudio();
+            pauseMenuVideo();
+            gameState = mode;
+            score = 0;
+            timeLeft = 120;
+            porks = [];
+            particles = [];
+            floatingTexts = [];
+            
+            document.getElementById('scoreDisplay').innerText = score;
+            document.getElementById('timeDisplay').innerText = timeLeft;
+            
+            document.getElementById('menuScreen').classList.add('hidden-screen');
+            document.getElementById('gameScreen').classList.remove('hidden-screen');
+            
+            resizeCanvas();
+            spawnPorks();
+            
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timeDisplay').innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            cancelAnimationFrame(animationFrameId);
+            gameState = 'menu';
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('gameOverModal').classList.remove('hidden-screen');
+            if (bgmLoop) Tone.Transport.stop();
+            stopWebcam();
+        }
+
+        function spawnPorks() {
+            porks = [];
+            const mobile = isMobileLayout();
+            const porkWidth = mobile ? 40 : 52;
+            const porkHeight = mobile ? 30 : 40;
+            const spawnRadius = pan.radius * (mobile ? 0.42 : 0.6);
+            
+            // สร้างตัวเลข 4 ตัว: ถูก 1 ตัว (หาร 3 ลงตัว), ผิด 3 ตัว (หาร 3 ไม่ลงตัว)
+            let numbers = [];
+            numbers.push((Math.floor(Math.random() * 33) + 1) * 3); // 1 ชิ้นที่ถูกต้อง
+            
+            for(let i=0; i<3; i++) { // 3 ชิ้นที่ผิด
+                let num;
+                do {
+                    num = Math.floor(Math.random() * 99) + 1;
+                } while (num % 3 === 0);
+                numbers.push(num);
+            }
+            
+            // สลับตำแหน่งตัวเลขใน Array (Shuffle)
+            numbers.sort(() => Math.random() - 0.5);
+
+            const positions = mobile
+                ? [
+                    { angle: -Math.PI / 2, r: spawnRadius * 0.95 },
+                    { angle: 0, r: spawnRadius * 0.9 },
+                    { angle: Math.PI / 2, r: spawnRadius * 0.95 },
+                    { angle: Math.PI, r: spawnRadius * 0.9 }
+                ]
+                : numbers.map(() => ({
+                    angle: Math.random() * Math.PI * 2,
+                    r: Math.random() * spawnRadius
+                }));
+
+            for (let i = 0; i < 4; i++) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 40) {
+                    const base = positions[i];
+                    const jitterAngle = mobile ? (Math.random() - 0.5) * 0.35 : Math.random() * Math.PI * 2;
+                    const jitterRadius = mobile ? (Math.random() - 0.5) * pan.radius * 0.08 : Math.random() * spawnRadius;
+                    const angle = base.angle + jitterAngle;
+                    const r = Math.max(0, Math.min(spawnRadius, base.r + jitterRadius));
+                    const x = pan.x + Math.cos(angle) * r;
+                    const y = pan.y + Math.sin(angle) * r;
+                    const newPork = { x, y, ox: x, oy: y, num: numbers[i], isDragging: false, width: porkWidth, height: porkHeight };
+                    const minDistance = mobile ? 54 : 80;
+                    if (!porks.some(p => Math.hypot(p.x - x, p.y - y) < minDistance)) {
+                        porks.push(newPork);
+                        placed = true;
+                    }
+                    attempts++;
+                }
+                if (!placed) {
+                    const fallback = positions[i];
+                    const x = pan.x + Math.cos(fallback.angle) * fallback.r;
+                    const y = pan.y + Math.sin(fallback.angle) * fallback.r;
+                    porks.push({ x, y, ox: x, oy: y, num: numbers[i], isDragging: false, width: porkWidth, height: porkHeight });
+                }
+            }
+        }
+
+        // --- DRAWING FUNCTIONS ---
+        function drawBackground() {
+            if (assets.bg.complete && assets.bg.naturalWidth !== 0) {
+                const img = assets.bg;
+                const scale = Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+                const drawWidth = img.naturalWidth * scale;
+                const drawHeight = img.naturalHeight * scale;
+                const dx = (canvas.width - drawWidth) / 2;
+                const dy = (canvas.height - drawHeight) / 2;
+                ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+            } else {
+                // Table gradient fallback
+                let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 100, canvas.width/2, canvas.height/2, canvas.width);
+                grad.addColorStop(0, '#4a3f35');
+                grad.addColorStop(1, '#1e1a17');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function drawPan() {
+            if (assets.pan.complete && assets.pan.naturalWidth !== 0) {
+                // Draw Pan Image
+                let size = pan.radius * 2.5;
+                ctx.drawImage(assets.pan, pan.x - size/2, pan.y - size/2, size, size);
+            } else {
+                // Fallback
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(pan.x, pan.y, pan.radius, 0, Math.PI*2);
+                ctx.fillStyle = '#222';
+                ctx.fill();
+                ctx.lineWidth = 15;
+                ctx.strokeStyle = '#000';
+                ctx.stroke();
+                
+                // Grill lines
+                ctx.strokeStyle = '#111';
+                ctx.lineWidth = 4;
+                for(let i = -pan.radius + 30; i < pan.radius; i+=40) {
+                    ctx.beginPath();
+                    let chord = Math.sqrt(pan.radius*pan.radius - i*i);
+                    ctx.moveTo(pan.x - chord, pan.y + i);
+                    ctx.lineTo(pan.x + chord, pan.y + i);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        function drawPlate() {
+            if (assets.plate.complete && assets.plate.naturalWidth !== 0) {
+                // Draw Plate Image
+                let size = plate.radius * 2.5;
+                ctx.drawImage(assets.plate, plate.x - size/2, plate.y - size/2, size, size);
+            } else {
+                // Fallback
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(plate.x, plate.y, plate.radius, 0, Math.PI*2);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fill();
+                
+                // Inner shadow/rim
+                ctx.beginPath();
+                ctx.arc(plate.x, plate.y, plate.radius - 20, 0, Math.PI*2);
+                ctx.strokeStyle = '#e9ecef';
+                ctx.lineWidth = 5;
+                ctx.stroke();
+                
+                // Plate shadow
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 30;
+                ctx.shadowOffsetX = 10;
+                ctx.shadowOffsetY = 10;
+                ctx.stroke(); // apply shadow
+                ctx.restore();
+            }
+        }
+
+        function drawPork(pork) {
+            ctx.save();
+            ctx.translate(pork.x, pork.y);
+            const mobile = isMobileLayout();
+            const sizeScale = mobile ? 2.35 : 2.85;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+            ctx.shadowBlur = mobile ? 16 : 24;
+            ctx.shadowOffsetX = mobile ? 5 : 7;
+            ctx.shadowOffsetY = mobile ? 7 : 10;
+            if (pork.isDragging) {
+                ctx.scale(mobile ? 1.08 : 1.15, mobile ? 1.08 : 1.15);
+            }
+            
+            if (assets.pork.complete && assets.pork.naturalWidth !== 0) {
+                let sizeX = pork.width * sizeScale;
+                let sizeY = pork.height * sizeScale;
+                ctx.drawImage(assets.pork, -sizeX/2, -sizeY/2, sizeX, sizeY);
+            } else {
+                // Meat Fallback
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+                ctx.shadowBlur = mobile ? 14 : 20;
+                ctx.shadowOffsetX = mobile ? 4 : 6;
+                ctx.shadowOffsetY = mobile ? 6 : 8;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, pork.width, pork.height, 0, 0, Math.PI*2);
+                ctx.fillStyle = '#ff7b7b'; // pinkish
+                ctx.fill();
+                ctx.strokeStyle = '#c44536';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Marbling
+                ctx.beginPath();
+                ctx.moveTo(-pork.width*0.6, -pork.height*0.5);
+                ctx.bezierCurveTo(-pork.width*0.2, 0, pork.width*0.2, -pork.height*0.2, pork.width*0.6, pork.height*0.5);
+                ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Number (วางทับบนรูปหมูเสมอ)
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${mobile ? 24 : 32}px Mitr`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 5;
+            ctx.fillText(pork.num, 0, 0);
+            
+            ctx.restore();
+        }
+
+        function drawChopsticks(x, y, isPinching) {
+            ctx.save();
+            ctx.translate(x, y);
+            const mobile = isMobileLayout();
+            
+            if (assets.chopsticks.complete && assets.chopsticks.naturalWidth !== 0) {
+                ctx.rotate(isPinching ? -0.1 : 0);
+                // Adjust size and pivot
+                ctx.drawImage(assets.chopsticks, mobile ? -16 : -20, mobile ? -150 : -180, mobile ? 64 : 80, mobile ? 170 : 200);
+            } else {
+                // Fallback
+                ctx.fillStyle = '#d4a373';
+                ctx.strokeStyle = '#8b5a2b';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 10;
+                
+                // Stick 1
+                ctx.save();
+                ctx.rotate(isPinching ? -0.05 : -0.2);
+                ctx.fillRect(-5, mobile ? -130 : -150, 10, mobile ? 170 : 200);
+                ctx.strokeRect(-5, mobile ? -130 : -150, 10, mobile ? 170 : 200);
+                ctx.restore();
+
+                // Stick 2
+                ctx.save();
+                ctx.rotate(isPinching ? 0.05 : 0.2);
+                ctx.fillRect(10, mobile ? -130 : -150, 10, mobile ? 170 : 200);
+                ctx.strokeRect(10, mobile ? -130 : -150, 10, mobile ? 170 : 200);
+                ctx.restore();
+            }
+            
+            ctx.restore();
+        }
+
+        function spawnParticles(x, y, color) {
+            for(let i = 0; i < 40; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15,
+                    life: 1.0,
+                    color: color,
+                    size: Math.random() * 8 + 4
+                });
+            }
+        }
+        
+        function addFloatingText(text, x, y, color) {
+            floatingTexts.push({ text, x, y, color, life: 1.0 });
+        }
+
+        function drawEffects() {
+            // Particles
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+            
+            // Floating Texts
+            for(let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.y -= 2;
+                ft.life -= 0.015;
+                
+                ctx.globalAlpha = ft.life;
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 50px Mitr';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 4;
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.globalAlpha = 1.0;
+                
+                if(ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+
+        function checkAnswer(pork) {
+            if (pork.num % 3 === 0) {
+                // Correct
+                score += 10;
+                document.getElementById('scoreDisplay').innerText = score;
+                playCorrectSound();
+                playSizzleBurst(1.2);
+                speak("อิ่มอร่อยเก่งมาก!", 1.5);
+                spawnParticles(plate.x, plate.y, '#4ade80');
+                addFloatingText("ยอดเยี่ยม!", plate.x, plate.y - 50, '#4ade80');
+            } else {
+                // Wrong
+                playWrongSound();
+                playSizzleBurst(0.8);
+                speak("หิวจังลองใหม่จ้ะ", 0.8);
+                spawnParticles(plate.x, plate.y, '#f87171');
+                addFloatingText("ผิดจ้า!", plate.x, plate.y - 50, '#f87171');
+            }
+            
+            // รีเซ็ตหมูใหม่ทั้ง 4 ชิ้นทุกครั้งที่ตอบคำถาม ไม่ว่าจะถูกหรือผิด
+            spawnPorks();
+        }
+
+        function gameLoop() {
+            if (gameState === 'menu') return;
+
+            // Update AR logic if needed
+            if (gameState === 'playing_ar' && handLandmarker && video.readyState >= 2) {
+                let startTimeMs = performance.now();
+                if (lastVideoTime !== video.currentTime) {
+                    lastVideoTime = video.currentTime;
+                    let results = handLandmarker.detectForVideo(video, startTimeMs);
+                    
+                    if (results.landmarks && results.landmarks.length > 0) {
+                        let lm = results.landmarks[0]; // first hand
+                        // landmarks 8 (index tip), 4 (thumb tip)
+                        let indexTip = lm[8];
+                        let thumbTip = lm[4];
+                        
+                        // Map to canvas (Flip X for mirror effect)
+                        let rawX = (1 - ((indexTip.x + thumbTip.x) / 2)) * canvas.width;
+                        let rawY = ((indexTip.y + thumbTip.y) / 2) * canvas.height;
+                        
+                        // Smooth movement
+                        smoothHandX += (rawX - smoothHandX) * 0.3;
+                        smoothHandY += (rawY - smoothHandY) * 0.3;
+                        
+                        let dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                        isPinching = dist < 0.05; // Pinch threshold
+                        
+                        if (isPinching) {
+                            if (!pinchedPork) {
+                                for (let p of porks) {
+                                    if (Math.hypot(p.x - smoothHandX, p.y - smoothHandY) < p.width + 20) {
+                                        pinchedPork = p;
+                                        p.isDragging = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (pinchedPork) {
+                                pinchedPork.x = smoothHandX;
+                                pinchedPork.y = smoothHandY;
+                            }
+                        } else {
+                            if (pinchedPork) {
+                                pinchedPork.isDragging = false;
+                                // Check if dropped in plate
+                                if (Math.hypot(pinchedPork.x - plate.x, pinchedPork.y - plate.y) < plate.radius) {
+                                    checkAnswer(pinchedPork);
+                                } else {
+                                    // Return
+                                    pinchedPork.x = pinchedPork.ox;
+                                    pinchedPork.y = pinchedPork.oy;
+                                }
+                                pinchedPork = null;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Draw
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawPan();
+            drawPlate();
+            
+            for (let p of porks) {
+                drawPork(p);
+            }
+            
+            if (gameState === 'playing_ar') {
+                drawChopsticks(smoothHandX, smoothHandY, isPinching);
+            }
+            
+            drawEffects();
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- INPUT HANDLING ---
+        function getPos(e) {
+            let rect = canvas.getBoundingClientRect();
+            let cx = e.clientX;
+            let cy = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                cx = e.touches[0].clientX;
+                cy = e.touches[0].clientY;
+            }
+            return {
+                x: (cx - rect.left) * (canvas.width / rect.width),
+                y: (cy - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function handlePointerDown(e) {
+            if (gameState !== 'playing_normal') return;
+            let pos = getPos(e);
+            for (let i = porks.length - 1; i >= 0; i--) {
+                let p = porks[i];
+                if (Math.hypot(p.x - pos.x, p.y - pos.y) < p.width) {
+                    draggedPork = p;
+                    p.isDragging = true;
+                    // Bring to front
+                    porks.push(porks.splice(i, 1)[0]);
+                    break;
+                }
+            }
+        }
+
+        function handlePointerMove(e) {
+            if (gameState !== 'playing_normal' || !draggedPork) return;
+            let pos = getPos(e);
+            draggedPork.x = pos.x;
+            draggedPork.y = pos.y;
+        }
+
+        function handlePointerUp(e) {
+            if (gameState !== 'playing_normal' || !draggedPork) return;
+            draggedPork.isDragging = false;
+            
+            // Check plate collision
+            if (Math.hypot(draggedPork.x - plate.x, draggedPork.y - plate.y) < plate.radius) {
+                checkAnswer(draggedPork);
+            } else {
+                draggedPork.x = draggedPork.ox;
+                draggedPork.y = draggedPork.oy;
+            }
+            draggedPork = null;
+        }
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+        
+        canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+        canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
+        window.addEventListener('touchend', handlePointerUp);
+
+        // --- BUTTON LISTENERS ---
+        document.getElementById('btnNormal').addEventListener('click', () => {
+            startGame('playing_normal');
+        });
+
+        document.getElementById('btnAR').addEventListener('click', async () => {
+            const ready = await initAR();
+            if (ready) startGame('playing_ar');
+        });
+
+        document.getElementById('btnHelp').addEventListener('click', () => {
+            document.getElementById('helpModal').classList.remove('hidden-screen');
+        });
+
+        document.getElementById('btnCloseHelp').addEventListener('click', () => {
+            document.getElementById('helpModal').classList.add('hidden-screen');
+        });
+
+        document.getElementById('btnExit').addEventListener('click', endGame);
+        document.getElementById('btnBackToMenu').addEventListener('click', () => {
+            document.getElementById('gameOverModal').classList.add('hidden-screen');
+            document.getElementById('gameScreen').classList.add('hidden-screen');
+            document.getElementById('menuScreen').classList.remove('hidden-screen');
+            replayMenuVideo();
+        });
+
+        // Background video may need a user gesture before sound starts on mobile browsers.
+        async function tryPlayMenuBg() {
+            if (document.getElementById('menuScreen').classList.contains('hidden-screen')) return;
+            try {
+                menuBg.muted = false;
+                menuBg.volume = 1;
+                await menuBg.play();
+            } catch (err) {
+                console.warn('Background video autoplay with sound was blocked:', err);
+            }
+        }
+
+        window.addEventListener('load', tryPlayMenuBg);
+        document.addEventListener('click', tryPlayMenuBg, { once: true });
+        document.addEventListener('touchstart', tryPlayMenuBg, { once: true, passive: true });
+        
+    </script>
+</body>
+</html>
