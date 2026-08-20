@@ -347,6 +347,19 @@
         // --- AUDIO & SPEECH ---
         async function initAudio() {
             await Tone.start();
+            // Prime HTMLAudio elements so mobile browsers allow later playback
+            function primeAudioElement(a) {
+                if (!a) return;
+                try {
+                    // try to play briefly to unlock; then pause and reset
+                    const p = a.play();
+                    if (p && p.then) {
+                        p.then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+                    }
+                } catch (e) {}
+            }
+            primeAudioElement(audioCorrect);
+            primeAudioElement(audioWrong);
             if (!bgmLoop) {
                 const lead = new Tone.PolySynth(Tone.Synth, {
                     oscillator: { type: "square" },
