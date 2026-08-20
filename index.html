@@ -78,6 +78,42 @@
             transform: scale(0.95);
         }
 
+        /* Menu buttons: colorful solid styles (no glass) */
+        #menuScreen .btn-glow {
+            border: none;
+            color: white;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+            background: transparent;
+        }
+        #menuScreen .btn-normal {
+            background: linear-gradient(90deg,#ff6b81 0%,#ff8a4d 100%);
+            box-shadow: 0 10px 30px rgba(255,107,129,0.12), 0 6px 14px rgba(0,0,0,0.18);
+            padding: 0.6rem 1rem;
+        }
+        #menuScreen .btn-ar {
+            background: linear-gradient(90deg,#7c3aed 0%,#3b82f6 100%);
+            box-shadow: 0 10px 30px rgba(124,58,237,0.12), 0 6px 14px rgba(0,0,0,0.18);
+            padding: 0.6rem 1rem;
+        }
+        #menuScreen .btn-glow::before { display:none; }
+        #menuScreen .btn-glow:hover {
+            transform: translateY(-3px) scale(1.03);
+            filter: saturate(1.06) drop-shadow(0 10px 24px rgba(0,0,0,0.18));
+        }
+
+        /* Mobile: reduce button size and text for small screens */
+        @media (max-width: 767px) {
+            #menuScreen .btn-glow {
+                padding: 0.45rem 0.8rem !important;
+                font-size: 0.95rem !important;
+            }
+            #menuScreen .btn-normal, #menuScreen .btn-ar {
+                padding: 0.45rem 0.8rem !important;
+                font-size: 0.95rem !important;
+            }
+            #menuScreen .w-[calc(100%-1.5rem)] { gap: 0.5rem; }
+        }
+
         /* Game Canvas */
         #gameCanvas {
             display: block;
@@ -117,6 +153,7 @@
             background: rgba(0,0,0,0.8);
             backdrop-filter: blur(5px);
         }
+        /* Countdown overlay removed: countdown renders on canvas so background stays visible */
 
         .hud-glass {
             background: rgba(255, 255, 255, 0.14);
@@ -141,6 +178,16 @@
             .hud-pill {
                 padding: 0.45rem 0.7rem;
             }
+            /* Ensure menu buttons have inner padding on small screens so they aren't flush to the viewport edges */
+            #menuScreen .menu-buttons {
+                padding-left: 0.9rem;
+                padding-right: 0.9rem;
+                box-sizing: border-box;
+            }
+            #menuScreen .menu-buttons > button {
+                margin-left: 0.25rem;
+                margin-right: 0.25rem;
+            }
         }
     </style>
 </head>
@@ -156,12 +203,24 @@
         <!-- Help Button -->
         <button id="btnHelp" class="absolute top-4 right-4 w-11 h-11 md:w-12 md:h-12 rounded-full bg-blue-500 text-white font-bold text-2xl btn-glow border-4 border-white">?</button>
         
-        <div class="w-[calc(100%-1.5rem)] max-w-2xl flex flex-col sm:flex-row gap-3 sm:gap-6 items-stretch sm:items-center justify-center">
-            <button id="btnNormal" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full bg-gradient-to-r from-pink-500 to-red-500 text-white font-bold text-lg sm:text-2xl btn-glow border-4 border-white">
-                เล่นโหมดปกติ
+        <div class="w-[calc(100%-1.5rem)] menu-buttons max-w-2xl flex flex-col sm:flex-row gap-3 sm:gap-6 items-stretch sm:items-center justify-center">
+            <button id="btnNormal" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full text-white font-bold text-lg sm:text-2xl btn-glow btn-normal">
+                <span style="display:inline-flex;align-items:center;gap:0.6rem;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M3 2L21 12L14 14L12 22L9 18L11 14L3 2Z" fill="currentColor"></path>
+                            </svg>
+                    <span>เล่นโหมดปกติ</span>
+                </span>
             </button>
-            <button id="btnAR" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold text-lg sm:text-2xl btn-glow border-4 border-white">
-                เล่นโหมด AR
+            <button id="btnAR" class="w-full sm:w-auto px-6 sm:px-10 py-4 sm:py-5 rounded-full text-white font-bold text-lg sm:text-2xl btn-glow btn-ar">
+                <span style="display:inline-flex;align-items:center;gap:0.6rem;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"></rect>
+                        <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+                        <rect x="7" y="4" width="3" height="3" rx="0.5" fill="currentColor"></rect>
+                    </svg>
+                    <span>เล่นโหมด AR</span>
+                </span>
             </button>
         </div>
     </div>
@@ -187,6 +246,8 @@
             <div class="w-16 h-16 border-8 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
             <h2 class="text-white text-3xl font-bold">กำลังโหลดระบบ AR...</h2>
         </div>
+
+        <!-- Countdown Overlay removed: countdown will render directly on the canvas -->
     </div>
 
     <!-- Help Modal -->
@@ -273,6 +334,14 @@
         let sizzleLoop = null;
         let sizzleSynth = null;
         let musicStep = 0;
+        // Countdown (canvas-based)
+        let countdownShowing = false;
+        let countdownValue = 0;
+        // Preload correct/wrong audio
+        const audioCorrect = new Audio('assets/correct.mp3');
+        audioCorrect.preload = 'auto';
+        const audioWrong = new Audio('assets/wrong.mp3');
+        audioWrong.preload = 'auto';
         const menuBg = document.getElementById('menuBg');
 
         // --- AUDIO & SPEECH ---
@@ -373,16 +442,6 @@
             sizzleSynth.triggerAttackRelease("32n", now + 0.12, volume * 0.7);
         }
 
-        function speak(text, pitch = 1.5) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Stop current speech
-                let u = new SpeechSynthesisUtterance(text);
-                u.lang = 'th-TH';
-                u.rate = 1.2;
-                u.pitch = pitch;
-                window.speechSynthesis.speak(u);
-            }
-        }
 
         // --- AR INITIALIZATION ---
         async function initAR() {
@@ -455,22 +514,39 @@
 
         // --- GAME LOGIC ---
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            // Support high-DPI (Retina) screens by scaling canvas bitmap
+            const dpr = window.devicePixelRatio || 1;
+
+            // CSS layout size (in CSS pixels)
+            const cssW = window.innerWidth;
+            const cssH = window.innerHeight;
+
+            // Set actual canvas pixel size to CSS size * DPR
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+
+            // Keep CSS display size unchanged
+            canvas.style.width = cssW + 'px';
+            canvas.style.height = cssH + 'px';
+
+            // Scale drawing operations so 1 unit = 1 CSS pixel
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
             const mobile = isMobileLayout();
-            // Responsive positions
-            pan.x = canvas.width * (mobile ? 0.5 : 0.32);
-            pan.y = canvas.height * (mobile ? 0.28 : 0.55);
-            pan.radius = Math.min(canvas.width, canvas.height) * (mobile ? 0.28 : 0.36);
-            
-            plate.x = canvas.width * (mobile ? 0.5 : 0.8);
-            plate.y = canvas.height * (mobile ? 0.79 : 0.55);
-            plate.radius = Math.min(canvas.width, canvas.height) * (mobile ? 0.16 : 0.2);
+            // Compute positions using CSS pixels (not canvas pixels)
+            pan.x = cssW * (mobile ? 0.5 : 0.32);
+            pan.y = cssH * (mobile ? 0.28 : 0.55);
+            pan.radius = Math.min(cssW, cssH) * (mobile ? 0.28 : 0.36);
+
+            plate.x = cssW * (mobile ? 0.5 : 0.8);
+            plate.y = cssH * (mobile ? 0.79 : 0.55);
+            plate.radius = Math.min(cssW, cssH) * (mobile ? 0.16 : 0.2);
         }
         window.addEventListener('resize', resizeCanvas);
 
-        function startGame(mode) {
-            initAudio();
+        async function startGame(mode) {
+            // Note: `initAudio()` should be invoked from a user gesture
+            // (button click) before calling startGame, so WebAudio is allowed.
             pauseMenuVideo();
             gameState = mode;
             score = 0;
@@ -478,25 +554,46 @@
             porks = [];
             particles = [];
             floatingTexts = [];
-            
+
             document.getElementById('scoreDisplay').innerText = score;
             document.getElementById('timeDisplay').innerText = timeLeft;
-            
+
             document.getElementById('menuScreen').classList.add('hidden-screen');
             document.getElementById('gameScreen').classList.remove('hidden-screen');
-            
+
             resizeCanvas();
+            // Start render loop immediately so canvas-based countdown is visible
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+
+            // Canvas-based countdown (drawn in gameLoop)
+            let countdown = 5;
+            const beepSynth = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.02 }
+            }).toDestination();
+            countdownShowing = true;
+            for (let i = countdown; i > 0; i--) {
+                countdownValue = i;
+                try {
+                    const now = Tone.now();
+                    beepSynth.triggerAttackRelease((i === 1) ? 'A4' : 'C5', '8n', now);
+                } catch (err) {}
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            try { beepSynth.triggerAttackRelease('E5', '16n', Tone.now()); } catch (e) {}
+            countdownShowing = false;
+            countdownValue = 0;
+
+            // Start the game proper after countdown
             spawnPorks();
-            
+
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
                 document.getElementById('timeDisplay').innerText = timeLeft;
                 if (timeLeft <= 0) endGame();
             }, 1000);
-            
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            gameLoop();
         }
 
         function endGame() {
@@ -573,21 +670,24 @@
 
         // --- DRAWING FUNCTIONS ---
         function drawBackground() {
+            const dpr = window.devicePixelRatio || 1;
+            const cssW = canvas.width / dpr;
+            const cssH = canvas.height / dpr;
             if (assets.bg.complete && assets.bg.naturalWidth !== 0) {
                 const img = assets.bg;
-                const scale = Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+                const scale = Math.max(cssW / img.naturalWidth, cssH / img.naturalHeight);
                 const drawWidth = img.naturalWidth * scale;
                 const drawHeight = img.naturalHeight * scale;
-                const dx = (canvas.width - drawWidth) / 2;
-                const dy = (canvas.height - drawHeight) / 2;
+                const dx = (cssW - drawWidth) / 2;
+                const dy = (cssH - drawHeight) / 2;
                 ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
             } else {
-                // Table gradient fallback
-                let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 100, canvas.width/2, canvas.height/2, canvas.width);
+                // Table gradient fallback (use CSS pixels)
+                let grad = ctx.createRadialGradient(cssW/2, cssH/2, 100, cssW/2, cssH/2, cssW);
                 grad.addColorStop(0, '#4a3f35');
                 grad.addColorStop(1, '#1e1a17');
                 ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, cssW, cssH);
             }
         }
 
@@ -709,7 +809,6 @@
             ctx.save();
             ctx.translate(x, y);
             const mobile = isMobileLayout();
-            
             if (assets.chopsticks.complete && assets.chopsticks.naturalWidth !== 0) {
                 ctx.rotate(isPinching ? -0.1 : 0);
                 // Adjust size and pivot
@@ -800,16 +899,16 @@
                 // Correct
                 score += 10;
                 document.getElementById('scoreDisplay').innerText = score;
-                playCorrectSound();
+                try { audioCorrect.currentTime = 0; audioCorrect.play(); } catch (e) {}
                 playSizzleBurst(1.2);
-                speak("อิ่มอร่อยเก่งมาก!", 1.5);
+                // speak("อิ่มอร่อยเก่งมาก!", 1.5);
                 spawnParticles(plate.x, plate.y, '#4ade80');
                 addFloatingText("ยอดเยี่ยม!", plate.x, plate.y - 50, '#4ade80');
             } else {
                 // Wrong
-                playWrongSound();
+                try { audioWrong.currentTime = 0; audioWrong.play(); } catch (e) {}
                 playSizzleBurst(0.8);
-                speak("หิวจังลองใหม่จ้ะ", 0.8);
+                // speak("หิวจังลองใหม่จ้ะ", 0.8);
                 spawnParticles(plate.x, plate.y, '#f87171');
                 addFloatingText("ผิดจ้า!", plate.x, plate.y - 50, '#f87171');
             }
@@ -820,6 +919,9 @@
 
         function gameLoop() {
             if (gameState === 'menu') return;
+            const dpr = window.devicePixelRatio || 1;
+            const cssW = canvas.width / dpr;
+            const cssH = canvas.height / dpr;
 
             // Update AR logic if needed
             if (gameState === 'playing_ar' && handLandmarker && video.readyState >= 2) {
@@ -834,9 +936,19 @@
                         let indexTip = lm[8];
                         let thumbTip = lm[4];
                         
-                        // Map to canvas (Flip X for mirror effect)
-                        let rawX = (1 - ((indexTip.x + thumbTip.x) / 2)) * canvas.width;
-                        let rawY = ((indexTip.y + thumbTip.y) / 2) * canvas.height;
+                        // Map to canvas (Flip X for mirror effect), using CSS pixels
+                        let rawX = (1 - ((indexTip.x + thumbTip.x) / 2)) * cssW;
+                        let rawY = ((indexTip.y + thumbTip.y) / 2) * cssH;
+                        // Compute the chopstick tip coordinates to match drawing
+                        const chopstickRotation = isPinching ? -0.1 : 0;
+                        const mobile = isMobileLayout();
+                        const imgOffsetX = (mobile ? -16 : -20);
+                        const imgOffsetY = (mobile ? -150 : -180);
+                        // rotate offset
+                        const rx = imgOffsetX * Math.cos(chopstickRotation) - imgOffsetY * Math.sin(chopstickRotation);
+                        const ry = imgOffsetX * Math.sin(chopstickRotation) + imgOffsetY * Math.cos(chopstickRotation);
+                        const tipX = rawX + rx;
+                        const tipY = rawY + ry;
                         
                         // Smooth movement
                         smoothHandX += (rawX - smoothHandX) * 0.3;
@@ -848,7 +960,7 @@
                         if (isPinching) {
                             if (!pinchedPork) {
                                 for (let p of porks) {
-                                    if (Math.hypot(p.x - smoothHandX, p.y - smoothHandY) < p.width + 20) {
+                                    if (Math.hypot(p.x - tipX, p.y - tipY) < p.width + 20) {
                                         pinchedPork = p;
                                         p.isDragging = true;
                                         break;
@@ -856,8 +968,8 @@
                                 }
                             }
                             if (pinchedPork) {
-                                pinchedPork.x = smoothHandX;
-                                pinchedPork.y = smoothHandY;
+                                pinchedPork.x = tipX;
+                                pinchedPork.y = tipY;
                             }
                         } else {
                             if (pinchedPork) {
@@ -877,8 +989,8 @@
                 }
             }
 
-            // Draw
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw (clear using CSS pixel size because ctx is scaled by DPR)
+            ctx.clearRect(0, 0, cssW, cssH);
             drawBackground();
             drawPan();
             drawPlate();
@@ -892,6 +1004,33 @@
             }
             
             drawEffects();
+
+            // Draw countdown on canvas if active
+            if (countdownShowing && countdownValue > 0) {
+                ctx.save();
+                // center
+                const cx = cssW / 2;
+                const cy = cssH / 2;
+                // subtle glass circle behind number
+                ctx.beginPath();
+                const radius = Math.min(cssW, cssH) * 0.18;
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+                ctx.lineWidth = 2;
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Number
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${Math.round(radius * 0.9)}px Mitr`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur = 10;
+                ctx.fillText(countdownValue.toString(), cx, cy + (Math.min(cssW, cssH) * 0.02));
+                ctx.restore();
+            }
             
             animationFrameId = requestAnimationFrame(gameLoop);
         }
@@ -905,14 +1044,20 @@
                 cx = e.touches[0].clientX;
                 cy = e.touches[0].clientY;
             }
+            // Convert pointer coordinates to canvas drawing coordinates.
+            // After enabling high-DPI canvas (canvas.width = cssW * dpr),
+            // drawing uses CSS-pixel coordinates because ctx is scaled by DPR.
+            // So map client coords -> CSS pixels (not bitmap pixels).
+            const dpr = window.devicePixelRatio || 1;
             return {
-                x: (cx - rect.left) * (canvas.width / rect.width),
-                y: (cy - rect.top) * (canvas.height / rect.height)
+                x: ((cx - rect.left) * (canvas.width / rect.width)) / dpr,
+                y: ((cy - rect.top) * (canvas.height / rect.height)) / dpr
             };
         }
 
         function handlePointerDown(e) {
             if (gameState !== 'playing_normal') return;
+            if (countdownShowing) return; // Ignore input during countdown
             let pos = getPos(e);
             for (let i = porks.length - 1; i >= 0; i--) {
                 let p = porks[i];
@@ -928,6 +1073,7 @@
 
         function handlePointerMove(e) {
             if (gameState !== 'playing_normal' || !draggedPork) return;
+            if (countdownShowing) return; // Ignore input during countdown
             let pos = getPos(e);
             draggedPork.x = pos.x;
             draggedPork.y = pos.y;
@@ -935,6 +1081,7 @@
 
         function handlePointerUp(e) {
             if (gameState !== 'playing_normal' || !draggedPork) return;
+            if (countdownShowing) return; // Ignore input during countdown
             draggedPork.isDragging = false;
             
             // Check plate collision
@@ -956,13 +1103,15 @@
         window.addEventListener('touchend', handlePointerUp);
 
         // --- BUTTON LISTENERS ---
-        document.getElementById('btnNormal').addEventListener('click', () => {
-            startGame('playing_normal');
+        document.getElementById('btnNormal').addEventListener('click', async () => {
+            await initAudio(); // start WebAudio from user gesture
+            await startGame('playing_normal');
         });
 
         document.getElementById('btnAR').addEventListener('click', async () => {
+            await initAudio(); // ensure audio context is allowed before camera permission
             const ready = await initAR();
-            if (ready) startGame('playing_ar');
+            if (ready) await startGame('playing_ar');
         });
 
         document.getElementById('btnHelp').addEventListener('click', () => {
@@ -980,6 +1129,8 @@
             document.getElementById('menuScreen').classList.remove('hidden-screen');
             replayMenuVideo();
         });
+
+        
 
         // Background video may need a user gesture before sound starts on mobile browsers.
         async function tryPlayMenuBg() {
